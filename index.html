@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#132b63" />
+    <meta
+      name="description"
+      content="I Can! — a superhero English action-word game for kids."
+    />
+    <title>I Can! — Superhero Word Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar" aria-label="Game status">
+        <div class="brand" aria-label="I Can">
+          <span class="brand-bolt" aria-hidden="true">⚡</span>
+          <span class="brand-copy">I CAN!</span>
+        </div>
+
+        <div class="hero-level" aria-label="Current hero level">
+          <span class="level-icon" aria-hidden="true">★</span>
+          <div>
+            <span class="eyebrow">HERO LEVEL</span>
+            <strong id="hero-level">SIDEKICK</strong>
+          </div>
+        </div>
+
+      </header>
+
+      <main class="game-stage">
+        <section class="intro-screen" id="intro-screen" aria-labelledby="intro-title">
+          <div class="comic-burst" aria-hidden="true">WOW!</div>
+          <div class="intro-copy">
+            <p class="kicker">3 SUPER GAMES</p>
+            <h1 id="intro-title">Discover what<br /><em>you can do!</em></h1>
+            <p class="intro-text">
+              Train every action in three different ways. Choose your first hero mission!
+            </p>
+            <div class="mode-grid" aria-label="Choose a game">
+              <button class="mode-card mode-card-blue" type="button" data-mode="choose">
+                <span class="mode-number">GAME 1</span>
+                <img class="mode-cover" src="assets/game-cover-find-action.png" alt="The cat and dog search for superhero actions" />
+                <span class="mode-card-copy">
+                  <strong>FIND THE ACTION</strong>
+                  <small>Read the phrase and choose the right move.</small>
+                  <span class="mode-play">PLAY <b>→</b></span>
+                </span>
+              </button>
+              <button class="mode-card mode-card-yellow" type="button" data-mode="memory">
+                <span class="mode-number">GAME 2</span>
+                <img class="mode-cover" src="assets/game-cover-power-pairs.png" alt="The cat and dog find matching superhero cards" />
+                <span class="mode-card-copy">
+                  <strong>POWER PAIRS</strong>
+                  <small>Match two pictures showing the same action.</small>
+                  <span class="mode-play">PLAY <b>→</b></span>
+                </span>
+              </button>
+              <button class="mode-card mode-card-red" type="button" data-mode="verify">
+                <span class="mode-number">GAME 3</span>
+                <img class="mode-cover" src="assets/game-cover-true-or-trick.png" alt="The dog listens while the cat checks an action" />
+                <span class="mode-card-copy">
+                  <strong>TRUE OR TRICK?</strong>
+                  <small>Listen and decide if the action matches.</small>
+                  <span class="mode-play">PLAY <b>→</b></span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="play-screen" id="play-screen" aria-labelledby="mission-heading" hidden>
+          <div class="progress-row">
+            <button class="game-back-button" id="game-back-button" type="button" aria-label="Back to all games">
+              <b aria-hidden="true">←</b> <span>GAMES</span>
+            </button>
+            <div class="round-label">
+              <span class="eyebrow" id="mode-label">MISSION</span>
+              <strong><span id="round-number">1</span> / <span id="round-total">8</span></strong>
+            </div>
+            <div class="power-track" aria-label="Mission progress">
+              <div class="power-fill" id="power-fill"></div>
+            </div>
+            <div class="streak-chip" id="streak-chip">
+              <span aria-hidden="true">🔥</span>
+              <span><b id="streak">0</b> COMBO</span>
+            </div>
+          </div>
+
+          <div class="mission-panel">
+            <div class="mission-tag">POWER PHRASE</div>
+            <p class="mission-hint" id="mission-hint">Find the action!</p>
+            <div class="phrase-row">
+              <h2 id="mission-heading">I can <span id="target-word">RUN</span>!</h2>
+              <button class="speak-button" id="speak-button" type="button" aria-label="Hear the phrase">
+                <span aria-hidden="true">🔊</span>
+              </button>
+            </div>
+            <div class="verify-visual" id="verify-visual" hidden>
+              <img id="verify-image" src="assets/actions/set1/run.jpg" alt="" width="512" height="512" />
+              <small>DOES IT MATCH?</small>
+            </div>
+          </div>
+
+          <div class="choices" id="choices" aria-label="Action choices"></div>
+
+          <div class="memory-decision" id="memory-decision" hidden>
+            <button class="confirm-pair-button" id="confirm-pair-button" type="button">
+              MATCH <span aria-hidden="true">⚡</span>
+            </button>
+            <button class="no-match-button" id="no-match-button" type="button">
+              NO MATCH <span aria-hidden="true">✕</span>
+            </button>
+          </div>
+
+          <div class="feedback" id="feedback" aria-live="assertive" aria-atomic="true">
+            <span class="feedback-icon" id="feedback-icon" aria-hidden="true"></span>
+            <span id="feedback-text">Choose your hero move!</span>
+          </div>
+        </section>
+
+        <section class="finish-screen" id="finish-screen" aria-labelledby="finish-title" hidden>
+          <div class="finish-burst" aria-hidden="true">SUPER!</div>
+          <p class="kicker">MISSION COMPLETE</p>
+          <h2 id="finish-title">You are a<br /><em>Word Hero!</em></h2>
+          <p class="finish-message" id="finish-message">Every action unlocked!</p>
+          <div class="results-card">
+            <div><strong id="final-score">0</strong><span>POWER</span></div>
+            <div><strong id="best-streak">0</strong><span>BEST COMBO</span></div>
+            <div><strong id="correct-count">0/8</strong><span>CORRECT</span></div>
+          </div>
+          <div class="badge-row" id="badge-row" aria-label="Unlocked actions"></div>
+          <div class="finish-actions">
+            <button class="primary-button" id="replay-button" type="button">
+              PLAY AGAIN <span aria-hidden="true">↻</span>
+            </button>
+            <button class="secondary-button" id="home-button" type="button">
+              ALL GAMES <span aria-hidden="true">⌂</span>
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer-note">
+        <span>Read it</span><i>•</i><span>Hear it</span><i>•</i><span>Power up!</span>
+      </footer>
+    </div>
+
+    <div class="fx-layer" id="fx-layer" aria-hidden="true"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
