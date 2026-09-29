@@ -495,8 +495,20 @@ h1 em,
 }
 
 .play-screen.memory-mode {
-  max-width: 1380px;
-  padding-inline: clamp(22px, 3vw, 38px);
+  width: min(760px, calc(100dvh - 220px));
+  max-width: 100%;
+  padding: 14px 22px;
+}
+
+.memory-mode .progress-row {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.memory-mode .memory-board {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .progress-row {
@@ -694,6 +706,24 @@ h1 em,
 
 .memory-mode .memory-card {
   aspect-ratio: 1;
+}
+
+.memory-mode .memory-decision {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.memory-mode .confirm-pair-button,
+.memory-mode .no-match-button {
+  min-width: 155px;
+  padding: 10px 16px 8px;
+  font-size: 14px;
+}
+
+.memory-mode .feedback {
+  min-height: 30px;
+  margin-top: 6px;
+  font-size: 13px;
 }
 
 .memory-index {
@@ -1334,6 +1364,7 @@ h1 em,
   .memory-content.is-image { font-size: 0; }
   .memory-decision { margin-top: 16px; gap: 8px; }
   .confirm-pair-button, .no-match-button { min-width: 0; flex: 1; padding: 12px 8px 9px; font-size: 14px; }
+  .memory-mode .confirm-pair-button, .memory-mode .no-match-button { min-width: 0; flex: 1; }
   .verify-visual img { width: 118px; height: 118px; }
   .verify-choices { gap: 10px; margin-top: 19px; }
   .verify-button { min-height: 73px; padding: 10px 5px; font-size: 21px; border-width: 3px; }
