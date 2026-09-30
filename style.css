@@ -1454,6 +1454,93 @@ h1 em,
   .results-card span { font-size: 8px; }
 }
 
+/* Fill tall desktop and classroom displays (4:3 and nearby ratios). */
+@media (min-width: 900px) and (min-height: 700px) and (max-aspect-ratio: 3 / 2) {
+  .game-stage {
+    width: calc(100% - 24px);
+    padding: 10px 0 12px;
+  }
+
+  .play-screen:not(.memory-mode),
+  .finish-screen {
+    max-width: none;
+    height: 100%;
+  }
+
+  .play-screen:not(.memory-mode) {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(18px, 2.4vh, 28px) clamp(24px, 3vw, 42px);
+  }
+
+  .play-screen:not(.memory-mode) .progress-row {
+    flex: 0 0 auto;
+    margin-bottom: clamp(14px, 1.8vh, 22px);
+  }
+
+  .play-screen:not(.memory-mode):not(.verify-mode) .mission-panel {
+    flex: 0 0 auto;
+    padding-block: clamp(28px, 3vh, 38px) clamp(18px, 2.2vh, 28px);
+  }
+
+  .play-screen:not(.memory-mode):not(.verify-mode) .choices {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+    margin-top: clamp(18px, 2.2vh, 28px);
+  }
+
+  .play-screen:not(.memory-mode):not(.verify-mode) .action-card {
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+  }
+
+  .play-screen:not(.memory-mode):not(.verify-mode) .action-card::before {
+    width: min(32vh, 320px);
+    height: min(32vh, 320px);
+    top: 50%;
+  }
+
+  .play-screen:not(.memory-mode):not(.verify-mode) .action-image {
+    width: min(92%, clamp(230px, 30vh, 320px));
+  }
+
+  .play-screen:not(.memory-mode) .feedback {
+    flex: 0 0 auto;
+    margin-top: clamp(10px, 1.5vh, 18px);
+  }
+
+  .play-screen.memory-mode {
+    width: min(860px, calc(100dvh - 180px));
+  }
+
+  .play-screen.verify-mode .mission-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .play-screen.verify-mode .verify-visual img {
+    width: clamp(360px, 48vh, 520px);
+  }
+
+  .play-screen.verify-mode .verify-choices {
+    flex: 0 0 auto;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 260px));
+    margin-top: clamp(12px, 1.8vh, 20px);
+  }
+
+  .play-screen.verify-mode .verify-button {
+    min-height: 68px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
