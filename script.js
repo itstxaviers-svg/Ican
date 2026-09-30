@@ -70,6 +70,28 @@ let memoryOpen = [];
 let memoryLocked = false;
 let matchedPairs = 0;
 let imageSetOffset = 0;
+let currentSpokenAction = null;
+let activeUtterance = null;
+let speechRequestId = 0;
+let audioContext = null;
+const activeOscillators = new Set();
+
+const phrasePlayer = new Audio();
+phrasePlayer.preload = "auto";
+phrasePlayer.volume = 1;
+
+const speechClipPaths = new Map([
+  ...actions.map((action) => [action.slug, `assets/audio/i-can-${action.slug}.mp3`]),
+  ["mission-complete", "assets/audio/mission-complete.mp3"],
+]);
+
+// The clips are tiny, so warming the browser cache prevents a pause before each phrase.
+const speechPreloads = [...speechClipPaths.values()].map((path) => {
+  const audio = new Audio(path);
+  audio.preload = "auto";
+  audio.load();
+  return audio;
+});
 
 const shuffle = (items) => {
   const copy = [...items];
@@ -100,38 +122,146 @@ function setFeedback(type, icon, text) {
   feedbackText.textContent = text;
 }
 
-function speak(text) {
-  if (!soundOn || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
+function selectEnglishVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  const preferredNames = [
+    "Samantha",
+    "Ava",
+    "Zoe",
+    "Google US English",
+    "Microsoft Aria Online (Natural) - English (United States)",
+    "Daniel",
+  ];
+  for (const name of preferredNames) {
+    const voice = voices.find((candidate) => candidate.name === name);
+    if (voice) return voice;
+  }
+  return voices.find((voice) => voice.lang.toLowerCase() === "en-us")
+    || voices.find((voice) => voice.lang.toLowerCase().startsWith("en"))
+    || null;
+}
+
+function haltSpeechPlayback() {
+  phrasePlayer.onerror = null;
+  phrasePlayer.onplaying = null;
+  phrasePlayer.onended = null;
+  phrasePlayer.pause();
+  phrasePlayer.currentTime = 0;
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  activeUtterance = null;
+  speakButton.classList.remove("speaking");
+}
+
+function stopSpeech() {
+  window.clearTimeout(speechTimer);
+  speechRequestId += 1;
+  haltSpeechPlayback();
+}
+
+function speakWithSystemVoice(text, requestId) {
+  if (!("speechSynthesis" in window) || requestId !== speechRequestId) return;
   const utterance = new SpeechSynthesisUtterance(text);
+  activeUtterance = utterance;
   utterance.lang = "en-US";
+  utterance.voice = selectEnglishVoice();
   utterance.rate = 0.82;
-  utterance.pitch = 1.08;
-  utterance.onstart = () => speakButton.classList.add("speaking");
-  utterance.onend = () => speakButton.classList.remove("speaking");
-  utterance.onerror = () => speakButton.classList.remove("speaking");
+  utterance.pitch = 1.02;
+  utterance.volume = 1;
+  utterance.onstart = () => {
+    if (requestId === speechRequestId) speakButton.classList.add("speaking");
+  };
+  utterance.onend = () => {
+    if (requestId !== speechRequestId) return;
+    activeUtterance = null;
+    speakButton.classList.remove("speaking");
+  };
+  utterance.onerror = utterance.onend;
   window.speechSynthesis.speak(utterance);
+}
+
+function playSpeech(clipKey, text, delay = 0) {
+  stopSpeech();
+  if (!soundOn) return;
+  const requestId = speechRequestId;
+  const startPlayback = () => {
+    if (requestId !== speechRequestId) return;
+    const clipPath = speechClipPaths.get(clipKey);
+    let fallbackStarted = false;
+    const useFallback = () => {
+      if (fallbackStarted || requestId !== speechRequestId) return;
+      fallbackStarted = true;
+      phrasePlayer.pause();
+      phrasePlayer.onerror = null;
+      speakWithSystemVoice(text, requestId);
+    };
+
+    phrasePlayer.src = clipPath;
+    phrasePlayer.currentTime = 0;
+    phrasePlayer.onerror = useFallback;
+    phrasePlayer.onplaying = () => {
+      if (requestId === speechRequestId) speakButton.classList.add("speaking");
+    };
+    phrasePlayer.onended = () => {
+      if (requestId === speechRequestId) speakButton.classList.remove("speaking");
+    };
+    const playPromise = phrasePlayer.play();
+    if (playPromise) playPromise.catch(useFallback);
+  };
+
+  if (delay > 0) speechTimer = window.setTimeout(startPlayback, delay);
+  else startPlayback();
+}
+
+function playActionPhrase(action, delay = 0) {
+  if (!action) return;
+  playSpeech(action.slug, `I can ${action.voice}`, delay);
+}
+
+function stopTones() {
+  activeOscillators.forEach((oscillator) => {
+    try {
+      oscillator.stop();
+    } catch (_) {
+      // The oscillator may already have ended.
+    }
+  });
+  activeOscillators.clear();
+}
+
+function stopAllAudio() {
+  stopSpeech();
+  stopTones();
 }
 
 function playTone(type) {
   if (!soundOn) return;
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
-  const context = new AudioContext();
-  const notes = type === "good" ? [523.25, 659.25, 783.99] : [220, 185];
-  notes.forEach((frequency, index) => {
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = type === "good" ? "triangle" : "sawtooth";
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(0.0001, context.currentTime + index * 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + index * 0.08 + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + index * 0.08 + 0.16);
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start(context.currentTime + index * 0.08);
-    oscillator.stop(context.currentTime + index * 0.08 + 0.18);
-  });
-  window.setTimeout(() => context.close(), 700);
+  stopTones();
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  if (!audioContext || audioContext.state === "closed") audioContext = new AudioContextClass();
+
+  const scheduleNotes = () => {
+    const notes = type === "good" ? [523.25, 659.25, 783.99] : [220, 185];
+    notes.forEach((frequency, index) => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const startsAt = audioContext.currentTime + index * 0.08;
+      oscillator.type = type === "good" ? "triangle" : "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, startsAt);
+      gain.gain.exponentialRampToValueAtTime(type === "good" ? 0.065 : 0.045, startsAt + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + 0.16);
+      oscillator.connect(gain).connect(audioContext.destination);
+      oscillator.addEventListener("ended", () => activeOscillators.delete(oscillator), { once: true });
+      activeOscillators.add(oscillator);
+      oscillator.start(startsAt);
+      oscillator.stop(startsAt + 0.18);
+    });
+  };
+
+  if (audioContext.state === "suspended") audioContext.resume().then(scheduleNotes).catch(() => {});
+  else scheduleNotes();
 }
 
 function burstStars(element) {
@@ -170,6 +300,7 @@ function popStreak() {
 }
 
 function preparePlayArea() {
+  stopSpeech();
   playScreen.classList.remove("memory-mode");
   playScreen.classList.remove("verify-mode");
   missionPanel.hidden = false;
@@ -189,6 +320,7 @@ function renderChooseRound() {
   roundLocked = false;
   preparePlayArea();
   const answer = deck[round];
+  currentSpokenAction = answer;
   const visualSet = (round + imageSetOffset) % 2;
   modeLabel.textContent = modeInfo.choose.label;
   roundNumberElement.textContent = round + 1;
@@ -208,7 +340,7 @@ function renderChooseRound() {
     choicesElement.appendChild(button);
   });
   updateStatus();
-  speechTimer = window.setTimeout(() => speak(`I can ${answer.voice}`), 250);
+  playActionPhrase(answer);
 }
 
 function checkChooseAnswer(card, selected, answer) {
@@ -220,9 +352,11 @@ function checkChooseAnswer(card, selected, answer) {
     streak = 0;
     setFeedback("error", "💥", "Not this one — try another hero move!");
     playTone("wrong");
+    playActionPhrase(answer, 300);
     updateStatus();
     return;
   }
+  stopSpeech();
   roundLocked = true;
   card.classList.add("correct");
   choicesElement.querySelectorAll("button").forEach((button) => { button.disabled = true; });
@@ -244,6 +378,7 @@ function checkChooseAnswer(card, selected, answer) {
 
 function renderMemoryGame() {
   preparePlayArea();
+  currentSpokenAction = null;
   playScreen.classList.add("memory-mode");
   missionPanel.hidden = true;
   speakButton.hidden = true;
@@ -378,6 +513,7 @@ function renderVerifyRound() {
   modeLabel.textContent = modeInfo.verify.label;
   roundNumberElement.textContent = round + 1;
   const answer = deck[round];
+  currentSpokenAction = answer;
   const visualSet = (round + imageSetOffset) % 2;
   missionPanel.classList.add("audio-mode");
   missionHint.textContent = "Listen, then look!";
@@ -402,7 +538,7 @@ function renderVerifyRound() {
     choicesElement.appendChild(button);
   });
   updateStatus();
-  speechTimer = window.setTimeout(() => speak(`I can ${answer.voice}`), 250);
+  playActionPhrase(answer);
 }
 
 function checkVerifyAnswer(button, selectedValue, answer) {
@@ -412,6 +548,7 @@ function checkVerifyAnswer(button, selectedValue, answer) {
   choicesElement.querySelectorAll("button").forEach((choiceButton) => { choiceButton.disabled = true; });
   const isCorrect = selectedValue === verifyIsMatch;
   if (isCorrect) {
+    stopSpeech();
     button.classList.add("correct");
     streak += 1;
     bestStreak = Math.max(bestStreak, streak);
@@ -428,7 +565,7 @@ function checkVerifyAnswer(button, selectedValue, answer) {
     verifyImage.alt = `${answer.voice} action`;
     setFeedback("error", "💥", "Listen again and look at the matching action.");
     playTone("wrong");
-    speechTimer = window.setTimeout(() => speak(`I can ${answer.voice}`), 260);
+    playActionPhrase(answer, 300);
   }
   round += 1;
   updateStatus();
@@ -441,8 +578,7 @@ function checkVerifyAnswer(button, selectedValue, answer) {
 function startGame(mode = currentMode) {
   window.clearTimeout(nextRoundTimer);
   window.clearTimeout(memoryTimer);
-  window.clearTimeout(speechTimer);
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  stopAllAudio();
   currentMode = mode;
   deck = shuffle(actions);
   round = 0;
@@ -463,6 +599,8 @@ function startGame(mode = currentMode) {
 }
 
 function finishGame() {
+  stopSpeech();
+  currentSpokenAction = null;
   document.querySelector("#final-score").textContent = score;
   document.querySelector("#best-streak").textContent = bestStreak;
   document.querySelector("#correct-count").textContent = `${correctCount}/${actions.length}`;
@@ -483,7 +621,7 @@ function finishGame() {
   setScreen("finish");
   if (currentMode !== "memory") {
     playTone("good");
-    speak("Mission complete! You are a word hero!");
+    playSpeech("mission-complete", "Mission complete! You are a word hero!", 360);
   }
 }
 
@@ -498,13 +636,13 @@ replayButton.addEventListener("click", () => startGame(currentMode));
 function returnToGameMenu() {
   window.clearTimeout(nextRoundTimer);
   window.clearTimeout(memoryTimer);
-  window.clearTimeout(speechTimer);
-  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  stopAllAudio();
   score = 0;
   streak = 0;
   memoryOpen = [];
   memoryLocked = false;
   roundLocked = false;
+  currentSpokenAction = null;
   memoryDecision.hidden = true;
   updateStatus();
   setScreen("intro");
@@ -514,9 +652,14 @@ gameBackButton.addEventListener("click", returnToGameMenu);
 homeButton.addEventListener("click", returnToGameMenu);
 
 speakButton.addEventListener("click", () => {
-  const action = deck[round];
-  if (action) speak(`I can ${action.voice}`);
+  if (!playScreen.hidden && currentMode !== "memory") playActionPhrase(currentSpokenAction);
 });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopAllAudio();
+});
+
+window.addEventListener("pagehide", stopAllAudio);
 
 document.addEventListener("keydown", (event) => {
   if (playScreen.hidden || roundLocked || memoryLocked) return;
