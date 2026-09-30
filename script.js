@@ -25,8 +25,12 @@ const modeInfo = {
 };
 
 const introScreen = document.querySelector("#intro-screen");
+const setupScreen = document.querySelector("#setup-screen");
 const playScreen = document.querySelector("#play-screen");
 const finishScreen = document.querySelector("#finish-screen");
+const setupBackButton = document.querySelector("#setup-back-button");
+const setupStartButton = document.querySelector("#setup-start-button");
+const setupTitle = document.querySelector("#setup-title");
 const gameBackButton = document.querySelector("#game-back-button");
 const replayButton = document.querySelector("#replay-button");
 const homeButton = document.querySelector("#home-button");
@@ -51,8 +55,20 @@ const confirmPairButton = document.querySelector("#confirm-pair-button");
 const noMatchButton = document.querySelector("#no-match-button");
 const fxLayer = document.querySelector("#fx-layer");
 const heroLevel = document.querySelector("#hero-level");
+const teamScoreboard = document.querySelector("#team-scoreboard");
+const teamScoreElements = [
+  document.querySelector("#team-1-score"),
+  document.querySelector("#team-2-score"),
+];
 
 let currentMode = "choose";
+let pendingMode = "choose";
+let selectedPlayMode = "solo";
+let selectedQuestionCount = 9;
+let gamePlayMode = "solo";
+let teamScores = [0, 0];
+let activeTeam = 0;
+let startingTeam = 0;
 let deck = [];
 let round = 0;
 let score = 0;
@@ -102,6 +118,20 @@ const shuffle = (items) => {
   return copy;
 };
 
+function buildQuestionDeck(questionCount) {
+  const questionDeck = [];
+  while (questionDeck.length < questionCount) {
+    const batch = shuffle(actions);
+    const previous = questionDeck[questionDeck.length - 1];
+    if (previous && batch[0].word === previous.word) {
+      const swapIndex = batch.findIndex((action) => action.word !== previous.word);
+      [batch[0], batch[swapIndex]] = [batch[swapIndex], batch[0]];
+    }
+    questionDeck.push(...batch.slice(0, questionCount - questionDeck.length));
+  }
+  return questionDeck;
+}
+
 const getChoices = (answer) => {
   const distractors = shuffle(actions.filter((action) => action.word !== answer.word)).slice(0, 2);
   return shuffle([answer, ...distractors]);
@@ -112,6 +142,7 @@ const getActionImage = (action, setIndex = 0) =>
 
 function setScreen(screen) {
   introScreen.hidden = screen !== "intro";
+  setupScreen.hidden = screen !== "setup";
   playScreen.hidden = screen !== "play";
   finishScreen.hidden = screen !== "finish";
 }
@@ -284,10 +315,48 @@ function burstStars(element) {
   });
 }
 
+function refreshSetupControls() {
+  document.querySelectorAll("[data-play-mode]").forEach((button) => {
+    const isSelected = button.dataset.playMode === selectedPlayMode;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+  document.querySelectorAll("[data-question-count]").forEach((button) => {
+    const isSelected = Number(button.dataset.questionCount) === selectedQuestionCount;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+}
+
+function openGameSetup(mode) {
+  pendingMode = mode;
+  setupTitle.textContent = modeInfo[mode].label;
+  refreshSetupControls();
+  setScreen("setup");
+}
+
+function updateTeamScoreboard() {
+  const isTeamGame = gamePlayMode === "teams" && currentMode !== "memory";
+  teamScoreboard.hidden = !isTeamGame;
+  if (!isTeamGame) return;
+  teamScoreElements.forEach((element, index) => {
+    element.textContent = teamScores[index];
+    element.closest(".team-score").classList.toggle("is-active", index === activeTeam);
+  });
+}
+
+function awardTeamPoint() {
+  if (gamePlayMode !== "teams") return;
+  teamScores[activeTeam] += 1;
+  updateTeamScoreboard();
+}
+
 function updateStatus() {
   const progress = currentMode === "memory" ? matchedPairs : round;
+  const total = currentMode === "memory" ? actions.length : deck.length;
   streakElement.textContent = streak;
-  powerFill.style.width = `${(progress / actions.length) * 100}%`;
+  powerFill.style.width = `${total ? (progress / total) * 100 : 0}%`;
+  updateTeamScoreboard();
   if (score >= 750) heroLevel.textContent = "SUPER HERO";
   else if (score >= 400) heroLevel.textContent = "HERO";
   else if (score >= 140) heroLevel.textContent = "RISING STAR";
@@ -318,6 +387,7 @@ function preparePlayArea() {
 
 function renderChooseRound() {
   roundLocked = false;
+  activeTeam = (startingTeam + round) % 2;
   preparePlayArea();
   const answer = deck[round];
   currentSpokenAction = answer;
@@ -350,9 +420,28 @@ function checkChooseAnswer(card, selected, answer) {
     void card.offsetWidth;
     card.classList.add("wrong");
     streak = 0;
-    setFeedback("error", "💥", "Not this one — try another hero move!");
+    const isTeamTurn = gamePlayMode === "teams";
+    setFeedback(
+      "error",
+      "💥",
+      isTeamTurn ? `No point for Team ${activeTeam + 1}. Here is the answer!` : "Not this one — try another hero move!",
+    );
     playTone("wrong");
     playActionPhrase(answer, 300);
+    if (isTeamTurn) {
+      roundLocked = true;
+      const cards = [...choicesElement.querySelectorAll("button")];
+      cards.forEach((button) => { button.disabled = true; });
+      const answerCard = cards.find((button) => button.getAttribute("aria-label") === answer.voice);
+      if (answerCard) answerCard.classList.add("answer-reveal");
+      round += 1;
+      updateStatus();
+      nextRoundTimer = window.setTimeout(() => {
+        if (round >= deck.length) finishGame();
+        else renderChooseRound();
+      }, 1400);
+      return;
+    }
     updateStatus();
     return;
   }
@@ -363,8 +452,15 @@ function checkChooseAnswer(card, selected, answer) {
   streak += 1;
   bestStreak = Math.max(bestStreak, streak);
   correctCount += 1;
+  awardTeamPoint();
   score += 100 + Math.min(streak - 1, 5) * 20;
-  setFeedback("success", "⚡", streak >= 3 ? `SUPER COMBO ×${streak}!` : `Yes! I can ${answer.voice}!`);
+  setFeedback(
+    "success",
+    "⚡",
+    gamePlayMode === "teams"
+      ? `Point for Team ${activeTeam + 1}!`
+      : (streak >= 3 ? `SUPER COMBO ×${streak}!` : `Yes! I can ${answer.voice}!`),
+  );
   popStreak();
   playTone("good");
   burstStars(card);
@@ -379,6 +475,7 @@ function checkChooseAnswer(card, selected, answer) {
 function renderMemoryGame() {
   preparePlayArea();
   currentSpokenAction = null;
+  teamScoreboard.hidden = true;
   playScreen.classList.add("memory-mode");
   missionPanel.hidden = true;
   speakButton.hidden = true;
@@ -508,6 +605,7 @@ function judgeMemoryChoice(playerSaysMatch) {
 
 function renderVerifyRound() {
   roundLocked = false;
+  activeTeam = (startingTeam + round) % 2;
   preparePlayArea();
   playScreen.classList.add("verify-mode");
   modeLabel.textContent = modeInfo.verify.label;
@@ -553,8 +651,13 @@ function checkVerifyAnswer(button, selectedValue, answer) {
     streak += 1;
     bestStreak = Math.max(bestStreak, streak);
     correctCount += 1;
+    awardTeamPoint();
     score += 110 + Math.min(streak - 1, 5) * 20;
-    setFeedback("success", "⚡", "Great listening!");
+    setFeedback(
+      "success",
+      "⚡",
+      gamePlayMode === "teams" ? `Point for Team ${activeTeam + 1}!` : "Great listening!",
+    );
     popStreak();
     playTone("good");
     burstStars(button);
@@ -563,7 +666,13 @@ function checkVerifyAnswer(button, selectedValue, answer) {
     streak = 0;
     verifyImage.src = getActionImage(answer, visualSet);
     verifyImage.alt = `${answer.voice} action`;
-    setFeedback("error", "💥", "Listen again and look at the matching action.");
+    setFeedback(
+      "error",
+      "💥",
+      gamePlayMode === "teams"
+        ? `No point for Team ${activeTeam + 1}. Here is the answer!`
+        : "Listen again and look at the matching action.",
+    );
     playTone("wrong");
     playActionPhrase(answer, 300);
   }
@@ -580,18 +689,24 @@ function startGame(mode = currentMode) {
   window.clearTimeout(memoryTimer);
   stopAllAudio();
   currentMode = mode;
-  deck = shuffle(actions);
+  gamePlayMode = currentMode === "memory" ? "solo" : selectedPlayMode;
+  deck = currentMode === "memory"
+    ? shuffle(actions)
+    : buildQuestionDeck(selectedQuestionCount);
   round = 0;
   score = 0;
   streak = 0;
   bestStreak = 0;
   correctCount = 0;
+  teamScores = [0, 0];
+  startingTeam = gamePlayMode === "teams" ? Math.floor(Math.random() * 2) : 0;
+  activeTeam = startingTeam;
   matchedPairs = 0;
   memoryOpen = [];
   memoryLocked = false;
   roundLocked = false;
   imageSetOffset = Math.floor(Math.random() * 2);
-  roundTotalElement.textContent = actions.length;
+  roundTotalElement.textContent = currentMode === "memory" ? actions.length : deck.length;
   setScreen("play");
   if (currentMode === "memory") renderMemoryGame();
   else if (currentMode === "verify") renderVerifyRound();
@@ -603,8 +718,16 @@ function finishGame() {
   currentSpokenAction = null;
   document.querySelector("#final-score").textContent = score;
   document.querySelector("#best-streak").textContent = bestStreak;
-  document.querySelector("#correct-count").textContent = `${correctCount}/${actions.length}`;
-  document.querySelector("#finish-message").textContent = modeInfo[currentMode].finish;
+  document.querySelector("#correct-count").textContent = `${correctCount}/${deck.length}`;
+  let finishMessage = modeInfo[currentMode].finish;
+  if (gamePlayMode === "teams") {
+    if (teamScores[0] === teamScores[1]) finishMessage = `It's a tie — ${teamScores[0]} : ${teamScores[1]}!`;
+    else {
+      const winner = teamScores[0] > teamScores[1] ? 1 : 2;
+      finishMessage = `Team ${winner} wins — ${teamScores[0]} : ${teamScores[1]}!`;
+    }
+  }
+  document.querySelector("#finish-message").textContent = finishMessage;
   const badgeRow = document.querySelector("#badge-row");
   badgeRow.replaceChildren();
   actions.forEach((action) => {
@@ -626,8 +749,29 @@ function finishGame() {
 }
 
 document.querySelectorAll(".mode-card").forEach((button) => {
-  button.addEventListener("click", () => startGame(button.dataset.mode));
+  button.addEventListener("click", () => {
+    const mode = button.dataset.mode;
+    if (mode === "memory") startGame(mode);
+    else openGameSetup(mode);
+  });
 });
+
+document.querySelectorAll("[data-play-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedPlayMode = button.dataset.playMode;
+    refreshSetupControls();
+  });
+});
+
+document.querySelectorAll("[data-question-count]").forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedQuestionCount = Number(button.dataset.questionCount);
+    refreshSetupControls();
+  });
+});
+
+setupStartButton.addEventListener("click", () => startGame(pendingMode));
+setupBackButton.addEventListener("click", returnToGameMenu);
 
 confirmPairButton.addEventListener("click", () => judgeMemoryChoice(true));
 noMatchButton.addEventListener("click", () => judgeMemoryChoice(false));
@@ -642,6 +786,10 @@ function returnToGameMenu() {
   memoryOpen = [];
   memoryLocked = false;
   roundLocked = false;
+  gamePlayMode = "solo";
+  teamScores = [0, 0];
+  activeTeam = 0;
+  teamScoreboard.hidden = true;
   currentSpokenAction = null;
   memoryDecision.hidden = true;
   updateStatus();

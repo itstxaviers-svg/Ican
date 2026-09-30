@@ -76,6 +76,44 @@
           </div>
         </section>
 
+        <section class="setup-screen" id="setup-screen" aria-labelledby="setup-title" hidden>
+          <button class="game-back-button setup-back-button" id="setup-back-button" type="button" aria-label="Back to all games">
+            <b aria-hidden="true">←</b> <span>GAMES</span>
+          </button>
+          <div class="setup-copy">
+            <p class="kicker">MISSION SETTINGS</p>
+            <h2 id="setup-title">FIND THE ACTION</h2>
+            <p class="setup-lead">Choose how you want to play.</p>
+
+            <div class="setup-options">
+              <div class="setup-group" role="group" aria-labelledby="play-mode-label">
+                <span class="setup-label" id="play-mode-label">PLAY MODE</span>
+                <div class="setup-choice-row">
+                  <button class="setup-choice is-selected" type="button" data-play-mode="solo" aria-pressed="true">
+                    <span aria-hidden="true">★</span> SOLO
+                  </button>
+                  <button class="setup-choice" type="button" data-play-mode="teams" aria-pressed="false">
+                    <span aria-hidden="true">⚡</span> 2 TEAMS
+                  </button>
+                </div>
+              </div>
+
+              <div class="setup-group" role="group" aria-labelledby="question-count-label">
+                <span class="setup-label" id="question-count-label">QUESTIONS</span>
+                <div class="setup-choice-row question-choice-row">
+                  <button class="setup-choice is-selected" type="button" data-question-count="9" aria-pressed="true">9</button>
+                  <button class="setup-choice" type="button" data-question-count="13" aria-pressed="false">13</button>
+                  <button class="setup-choice" type="button" data-question-count="17" aria-pressed="false">17</button>
+                </div>
+              </div>
+            </div>
+
+            <button class="primary-button setup-start-button" id="setup-start-button" type="button">
+              START GAME <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </section>
+
         <section class="play-screen" id="play-screen" aria-labelledby="mission-heading" hidden>
           <div class="progress-row">
             <button class="game-back-button" id="game-back-button" type="button" aria-label="Back to all games">
@@ -91,6 +129,18 @@
             <div class="streak-chip" id="streak-chip">
               <span aria-hidden="true">🔥</span>
               <span><b id="streak">0</b> COMBO</span>
+            </div>
+          </div>
+
+          <div class="team-scoreboard" id="team-scoreboard" aria-label="Team scores" hidden>
+            <div class="team-score is-active" data-team="0">
+              <span>TEAM 1</span>
+              <strong id="team-1-score">0</strong>
+            </div>
+            <span class="team-versus" aria-hidden="true">VS</span>
+            <div class="team-score" data-team="1">
+              <span>TEAM 2</span>
+              <strong id="team-2-score">0</strong>
             </div>
           </div>
 
